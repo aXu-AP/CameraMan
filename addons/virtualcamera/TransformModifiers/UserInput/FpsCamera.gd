@@ -58,7 +58,14 @@ func _input(event : InputEvent):
 
 func _physics_process(delta : float):
 	if not Engine.editor_hint:
-		_input_rotation += Input.get_vector(mapped_input_yaw_positive, mapped_input_yaw_negative, mapped_input_pitch_negative, mapped_input_pitch_positive) * mapped_input_sensitivity * delta
+#		_input_rotation += Input.get_vector(mapped_input_yaw_positive, mapped_input_yaw_negative, mapped_input_pitch_negative, mapped_input_pitch_positive) * mapped_input_sensitivity * delta
+		var mapped_input = Vector2.ZERO
+		mapped_input.x += Input.get_action_strength(mapped_input_yaw_negative) if mapped_input_yaw_negative else 0
+		mapped_input.x -= Input.get_action_strength(mapped_input_yaw_positive) if mapped_input_yaw_positive else 0
+		mapped_input.y += Input.get_action_strength(mapped_input_pitch_positive) if mapped_input_pitch_positive else 0
+		mapped_input.y -= Input.get_action_strength(mapped_input_pitch_negative) if mapped_input_pitch_negative else 0
+		mapped_input *= mapped_input_sensitivity * delta
+		_input_rotation += mapped_input
 		
 		var factor : Vector2 = deg2rad(1) * rotation_speed # Note: do conversion twice to not make separate conversion from _input_rotation
 		if invert_axes & 0b01:

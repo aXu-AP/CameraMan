@@ -1,0 +1,343 @@
+[gd_scene load_steps=27 format=2]
+
+[ext_resource path="res://addons/virtualcamera/VCameraBrain.gd" type="Script" id=1]
+[ext_resource path="res://addons/virtualcamera/TransformModifiers/UserInput/FpsCamera.gd" type="Script" id=2]
+[ext_resource path="res://addons/virtualcamera/VCameras/VCamera.gd" type="Script" id=3]
+[ext_resource path="res://addons/virtualcamera/TransformModifiers/LookAt.gd" type="Script" id=4]
+[ext_resource path="res://addons/virtualcamera/TransformModifiers/BackForthMovement.gd" type="Script" id=5]
+
+[sub_resource type="GDScript" id=29]
+script/source = "extends Node
+
+onready var vcameras : Array = get_tree().get_nodes_in_group(\"vcamera\")
+var index = 0
+
+func _ready() -> void:
+	Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.is_pressed():
+		if event.scancode == KEY_ESCAPE:
+			if Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
+				Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+			else:
+				Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+		elif event.scancode == KEY_TAB:
+			index += 1
+			index %= vcameras.size()
+			vcameras[index].grab_highlight()
+"
+
+[sub_resource type="ProceduralSky" id=1]
+sky_top_color = Color( 0.313726, 0.54902, 0.843137, 1 )
+sky_horizon_color = Color( 0.862745, 0.960784, 1, 1 )
+ground_bottom_color = Color( 0, 0, 0, 1 )
+ground_horizon_color = Color( 0.392157, 0.411765, 0.392157, 1 )
+sun_color = Color( 0.862745, 0.960784, 1, 1 )
+sun_latitude = 30.0
+sun_longitude = -150.0
+sun_angle_min = 2.0
+sun_angle_max = 30.0
+
+[sub_resource type="Environment" id=2]
+background_mode = 2
+background_sky = SubResource( 1 )
+ambient_light_color = Color( 0.27451, 0.27451, 0.27451, 1 )
+ambient_light_sky_contribution = 0.1
+fog_enabled = true
+fog_color = Color( 0.392157, 0.411765, 0.392157, 0.117647 )
+fog_sun_color = Color( 0.901961, 0.784314, 0.431373, 0.117647 )
+fog_sun_amount = 0.3
+fog_depth_begin = 5.0
+
+[sub_resource type="CubeMesh" id=14]
+size = Vector3( 50, 2, 50 )
+
+[sub_resource type="SpatialMaterial" id=4]
+albedo_color = Color( 0.392157, 0.72549, 0.392157, 1 )
+roughness = 0.7
+
+[sub_resource type="BoxShape" id=25]
+extents = Vector3( 25, 1, 25 )
+
+[sub_resource type="CylinderMesh" id=5]
+top_radius = 0.5
+bottom_radius = 0.5
+
+[sub_resource type="SpatialMaterial" id=11]
+albedo_color = Color( 0.333333, 0.254902, 0.372549, 1 )
+
+[sub_resource type="CylinderShape" id=26]
+radius = 0.5
+
+[sub_resource type="CylinderMesh" id=6]
+top_radius = 1.5
+bottom_radius = 1.5
+height = 1.0
+
+[sub_resource type="CylinderMesh" id=7]
+top_radius = 0.75
+bottom_radius = 0.75
+height = 1.0
+
+[sub_resource type="CubeMesh" id=12]
+size = Vector3( 4, 4, 4 )
+
+[sub_resource type="BoxShape" id=30]
+extents = Vector3( 2, 2, 2 )
+
+[sub_resource type="SpatialMaterial" id=13]
+albedo_color = Color( 0.313726, 0.54902, 0.843137, 1 )
+roughness = 0.45
+
+[sub_resource type="BoxShape" id=27]
+extents = Vector3( 25, 10, 1 )
+
+[sub_resource type="CubeMesh" id=17]
+size = Vector3( 1, 1, 1 )
+
+[sub_resource type="CylinderMesh" id=18]
+top_radius = 0.5
+bottom_radius = 0.5
+height = 1.0
+
+[sub_resource type="GDScript" id=28]
+script/source = "extends KinematicBody
+
+export var max_speed : float = 5.0
+export var acceleration : float = 30.0
+export var jump_speed : float = 5.0
+
+var speed : Vector3
+
+func _physics_process(delta: float) -> void:
+	var input = max_speed * Vector3(
+		int(Input.is_physical_key_pressed(KEY_D)) - int(Input.is_physical_key_pressed(KEY_A)),
+		0,
+		int(Input.is_physical_key_pressed(KEY_S)) - int(Input.is_physical_key_pressed(KEY_W))).normalized()
+	
+	input = global_transform.basis.xform(input) # Transform input into local coords
+	input.y = speed.y
+	speed = speed.move_toward(input, acceleration * delta)
+	
+	speed += Vector3.DOWN * 10 * delta # Gravity
+	if is_on_floor() and Input.is_physical_key_pressed(KEY_SPACE):
+		speed.y = jump_speed
+	
+	speed = move_and_slide(speed, Vector3.UP)
+
+
+"
+
+[sub_resource type="CapsuleShape" id=19]
+radius = 0.5
+
+[sub_resource type="CapsuleMesh" id=20]
+radius = 0.5
+
+[sub_resource type="SpatialMaterial" id=9]
+albedo_color = Color( 0.843137, 0.45098, 0.333333, 1 )
+roughness = 0.45
+
+[node name="FpsTpsExample" type="Node"]
+script = SubResource( 29 )
+
+[node name="World" type="Node" parent="."]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="World"]
+environment = SubResource( 2 )
+
+[node name="DirectionalLight" type="DirectionalLight" parent="World"]
+transform = Transform( 0.866025, 0.25, -0.433013, 0, 0.866025, 0.5, 0.5, -0.433012, 0.75, 0, 10, 0 )
+shadow_enabled = true
+
+[node name="VCameraBrain" type="Camera" parent="World"]
+process_priority = -1000
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.7, 0 )
+script = ExtResource( 1 )
+
+[node name="Level" type="Spatial" parent="World"]
+
+[node name="Ground" type="MeshInstance" parent="World/Level"]
+mesh = SubResource( 14 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 4 )
+
+[node name="StaticBody" type="StaticBody" parent="World/Level/Ground"]
+
+[node name="CollisionShape" type="CollisionShape" parent="World/Level/Ground/StaticBody"]
+shape = SubResource( 25 )
+
+[node name="Pillar1" type="MeshInstance" parent="World/Level"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 6.64687, 2, 5.30097 )
+mesh = SubResource( 5 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 11 )
+
+[node name="StaticBody" type="StaticBody" parent="World/Level/Pillar1"]
+
+[node name="CollisionShape" type="CollisionShape" parent="World/Level/Pillar1/StaticBody"]
+shape = SubResource( 26 )
+
+[node name="Pillar2" type="MeshInstance" parent="World/Level"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -22.8734, 2, -5.92979 )
+mesh = SubResource( 5 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 11 )
+
+[node name="StaticBody2" type="StaticBody" parent="World/Level/Pillar2"]
+
+[node name="CollisionShape" type="CollisionShape" parent="World/Level/Pillar2/StaticBody2"]
+shape = SubResource( 26 )
+
+[node name="Pillar3" type="MeshInstance" parent="World/Level"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, -11.3295, 1.5, -17.139 )
+mesh = SubResource( 6 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 11 )
+
+[node name="Pillar4" type="MeshInstance" parent="World/Level/Pillar3"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 1, -0.5 )
+mesh = SubResource( 7 )
+skeleton = NodePath("../../..")
+material/0 = SubResource( 11 )
+
+[node name="Block1" type="MeshInstance" parent="World/Level"]
+transform = Transform( 0.965926, 0, 0.258819, 0, 1, 0, -0.258819, 0, 0.965926, -1.9649, 3, 14.0545 )
+mesh = SubResource( 12 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 11 )
+
+[node name="StaticBody" type="StaticBody" parent="World/Level/Block1"]
+
+[node name="CollisionShape" type="CollisionShape" parent="World/Level/Block1/StaticBody"]
+shape = SubResource( 30 )
+
+[node name="Block2" type="MeshInstance" parent="World/Level"]
+transform = Transform( 0.860164, 0, -0.510018, 0, 1, 0, 0.510018, 0, 0.860164, 5.11689, 3, 13.2594 )
+mesh = SubResource( 12 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 11 )
+
+[node name="StaticBody" type="StaticBody" parent="World/Level/Block2"]
+
+[node name="CollisionShape" type="CollisionShape" parent="World/Level/Block2/StaticBody"]
+shape = SubResource( 30 )
+
+[node name="Block3" type="MeshInstance" parent="World/Level"]
+transform = Transform( 0.55114, 0, -1.39508, 0, 1.5, 0, 1.39508, 0, 0.55114, 13.2936, 4, 8.49103 )
+mesh = SubResource( 12 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 11 )
+
+[node name="StaticBody" type="StaticBody" parent="World/Level/Block3"]
+
+[node name="CollisionShape" type="CollisionShape" parent="World/Level/Block3/StaticBody"]
+shape = SubResource( 30 )
+
+[node name="Spatial" type="Spatial" parent="World/Level"]
+transform = Transform( 0.5586, 0, -0.829437, 0, 1, 0, 0.829437, 0, 0.5586, 18.6572, 0.987936, 7.28223 )
+
+[node name="BackForthMovement" type="Spatial" parent="World/Level/Spatial"]
+transform = Transform( 1, 0, -2.98023e-08, 0, 1, 0, 2.98023e-08, 0, 1, 0, 1.61341, 0 )
+script = ExtResource( 5 )
+duration_forth = 2.0
+duration_back = 2.0
+translate_by = Vector3( 0, 6, 0 )
+
+[node name="Block4" type="MeshInstance" parent="World/Level/Spatial/BackForthMovement"]
+transform = Transform( -0.219267, 0, -0.975665, 0, 0.1, 0, 0.975665, 0, -0.219267, 0, 0, 0 )
+mesh = SubResource( 12 )
+skeleton = NodePath("../../../..")
+material/0 = SubResource( 13 )
+
+[node name="StaticBody" type="StaticBody" parent="World/Level/Spatial/BackForthMovement/Block4"]
+
+[node name="CollisionShape" type="CollisionShape" parent="World/Level/Spatial/BackForthMovement/Block4/StaticBody"]
+shape = SubResource( 30 )
+
+[node name="Bounds" type="StaticBody" parent="World/Level"]
+
+[node name="CollisionShape1" type="CollisionShape" parent="World/Level/Bounds"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, 26 )
+shape = SubResource( 27 )
+
+[node name="CollisionShape2" type="CollisionShape" parent="World/Level/Bounds"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 9, -26 )
+shape = SubResource( 27 )
+
+[node name="CollisionShape3" type="CollisionShape" parent="World/Level/Bounds"]
+transform = Transform( -4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, 26, 9, 0 )
+shape = SubResource( 27 )
+
+[node name="CollisionShape4" type="CollisionShape" parent="World/Level/Bounds"]
+transform = Transform( -4.37114e-08, 0, 1, 0, 1, 0, -1, 0, -4.37114e-08, -26, 9, 0 )
+shape = SubResource( 27 )
+
+[node name="Train" type="Spatial" parent="World"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -10.5 )
+
+[node name="Base" type="MeshInstance" parent="World/Train"]
+transform = Transform( 10, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 0 )
+mesh = SubResource( 17 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 13 )
+
+[node name="Cabin" type="MeshInstance" parent="World/Train"]
+transform = Transform( 5.28, 0, 0, 0, 3.12, 0, 0, 0, 3.3, 3, 2, 0 )
+mesh = SubResource( 17 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 13 )
+
+[node name="Nose" type="MeshInstance" parent="World/Train"]
+transform = Transform( -1.31134e-07, -5, 0, 3, -2.18557e-07, 0, 0, 0, 3, -2, 1, 0 )
+mesh = SubResource( 18 )
+skeleton = NodePath("../..")
+material/0 = SubResource( 13 )
+
+[node name="Player" type="KinematicBody" parent="World"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.999999, 0 )
+script = SubResource( 28 )
+
+[node name="CollisionShape" type="CollisionShape" parent="World/Player"]
+transform = Transform( 1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 1, 0 )
+shape = SubResource( 19 )
+
+[node name="MeshInstance" type="MeshInstance" parent="World/Player"]
+transform = Transform( 1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 1, 0 )
+mesh = SubResource( 20 )
+material/0 = SubResource( 9 )
+
+[node name="FpsCamera" type="Spatial" parent="World/Player"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.7, 0 )
+script = ExtResource( 2 )
+rotation_speed = Vector2( 90, 90 )
+lerp_speed = 1.0
+invert_axes = 0
+mouse_enabled = true
+mouse_sensitivity = 1.0
+mapped_input_yaw_positive = "ui_right"
+mapped_input_yaw_negative = "ui_left"
+mapped_input_pitch_positive = "ui_up"
+mapped_input_pitch_negative = "ui_down"
+mapped_input_sensitivity = 1.0
+instead_yaw_target_path = NodePath("..")
+instead_pitch_target_path = NodePath("")
+
+[node name="FpsVCamera" type="Spatial" parent="World/Player/FpsCamera" groups=["vcamera"]]
+process_priority = -1000
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0 )
+script = ExtResource( 3 )
+
+[node name="LookTarget" type="Position3D" parent="World/Player/FpsCamera"]
+transform = Transform( 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10 )
+
+[node name="LookAt" type="Spatial" parent="World/Player/FpsCamera"]
+transform = Transform( 0.997054, -0.00117633, 0.0766875, 5.82077e-11, 0.999882, 0.0153375, -0.0766965, -0.0152923, 0.996937, 1, 0.2, 3 )
+script = ExtResource( 4 )
+look_at_target = NodePath("../LookTarget")
+
+[node name="TpsVCamera" type="Spatial" parent="World/Player/FpsCamera/LookAt" groups=["vcamera"]]
+process_priority = -1000
+transform = Transform( 1, 0, 7.45058e-09, -2.32831e-10, 1, 0, 0, 1.86265e-09, 1, 0, 0, 0 )
+script = ExtResource( 3 )

@@ -18,11 +18,29 @@ func set_fov(value : float) -> void:
 export(float, EXP, 0.01, 8192) var near : float = 0.05
 export(float, EXP, 0.01, 8192) var far : float = 100.0
 
+var _highlighted : bool = false
+var _do_highlight : bool = false
+
 func _ready():
 	if Engine.editor_hint:
 		rebuild_geom()
 		set_process_priority(-1000)
 	add_to_group("vcamera", true)
+
+# Tells if this VCamera was highlighted on this frame. Returns into false on next frame.
+func is_highlighted() -> bool:
+	return _highlighted
+
+# Tells this VCamera to be higher priority on this frame.
+# Grabs VCameraBrain's attention even if VCamera with similiar priority is selected.
+# If there is other, higher priority VCameras, does nothing.
+func grab_highlight() -> void:
+	_do_highlight = true
+
+func _physics_process(delta: float) -> void:
+	_highlighted = _do_highlight
+	_do_highlight = false
+
 
 func _process(delta : float):
 	if Engine.editor_hint:

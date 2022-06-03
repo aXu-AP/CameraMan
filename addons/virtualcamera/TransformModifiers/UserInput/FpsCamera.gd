@@ -1,46 +1,103 @@
 tool
 extends "res://addons/virtualcamera/TransformModifiers/UserInput/UserInput.gd"
-
+# Transform modifier for first person camera. Controllable via mouse or mapped inputs.
 class_name FpsCamera
 
-export var positive_yaw_mapped_input : String
-export var negative_yaw_mapped_input : String
-export var positive_pitch_mapped_input : String
-export var negative_pitch_mapped_input : String
+# Speed of rotation in degrees per second.
+var rotation_speed : Vector2 = Vector2(90, 90)
+# Smoothing value from 0 (extreme smoothing) to 1 (no smoothing).
+var lerp_speed : float = 1.0
+# Inverts X (yaw) or Y (pitch) rotation defined by bit mask.
+# Bit 0b01: X
+# Bit 0b10: Y
+var invert_axes : int = 0b00
 
-export var mouse_input : bool = true
-export var mouse_sensitivity : float = 0.25
-export var rotation_speed : Vector2 = Vector2(1, 1)
-export(float, 0.0, 1.0) var lerp_speed : float = 1.0
+# Enables mouse to control rotation.
+var mouse_enabled : bool = true
+# How much modifier rotates. 100 pixels of mouse movement results in rotation_speed degrees of rotation.
+var mouse_sensitivity : float = 1.0
 
-export(int, FLAGS, "X", "Y") var invert_axis = 0b10
+# Action name from Input Map to rotate to right.
+var mapped_input_yaw_positive : String
+# Action name from Input Map to rotate to left.
+var mapped_input_yaw_negative : String
+# Action name from Input Map to rotate to up.
+var mapped_input_pitch_positive : String
+# Action name from Input Map to rotate to down.
+var mapped_input_pitch_negative : String
+# How much modifier rotates multiplied with rotation_speed.
+var mapped_input_sensitivity : float = 1.0
 
-onready var input_rotation : Vector2 = Vector2.ZERO
+# Optional Spatial node to rotate instead of itself. Handles X (yaw) rotation.
+# Useful, if you want to rotate character root node. Settable in editor.
+var instead_yaw_target_path : NodePath
+# Optional Spatial node to rotate instead of itself. Handles Y (pitch) rotation.
+# Useful, if you want to rotate character root node. Settable in editor.
+var instead_pitch_target_path : NodePath
+
+# Optional Spatial node to rotate instead of itself. Handles X (yaw) rotation.
+# Useful, if you want to rotate character root node. Settable runtime.
+var instead_yaw_target : Spatial
+# Optional Spatial node to rotate instead of itself. Handles Y (pitch) rotation.
+# Useful, if you want to rotate character root node. Settable runtime.
+var instead_pitch_target : Spatial
+
+var _input_rotation : Vector2 = Vector2.ZERO
+
+
+func _ready() -> void:
+	if instead_yaw_target_path:
+		instead_yaw_target = get_node(instead_yaw_target_path)
+	if instead_pitch_target_path:
+		instead_pitch_target = get_node(instead_pitch_target_path)
 
 func _input(event : InputEvent):
-	if mouse_input and event is InputEventMouseMotion:
-		input_rotation.x -= event.relative.x * rotation_speed.x * mouse_sensitivity
-		input_rotation.y -= event.relative.y * rotation_speed.y * mouse_sensitivity
+	if mouse_enabled and event is InputEventMouseMotion:
+		_input_rotation.x -= event.relative.x * mouse_sensitivity / 100.0
+		_input_rotation.y -= event.relative.y * mouse_sensitivity / 100.0
 
 func _physics_process(delta : float):
 	if not Engine.editor_hint:
-		var yaw_axis = 0.0
-		if !negative_yaw_mapped_input.empty():
-			yaw_axis -= Input.get_action_strength(negative_yaw_mapped_input)
-		if !positive_yaw_mapped_input.empty():
-			yaw_axis += Input.get_action_strength(positive_yaw_mapped_input)
-		input_rotation.x += yaw_axis * rotation_speed.x * 5
+		_input_rotation += Input.get_vector(mapped_input_yaw_positive, mapped_input_yaw_negative, mapped_input_pitch_negative, mapped_input_pitch_positive) * mapped_input_sensitivity * delta
 		
-		var pitch_axis = 0.0
-		if !negative_pitch_mapped_input.empty():
-			pitch_axis -= Input.get_action_strength(negative_pitch_mapped_input)
-		if !positive_pitch_mapped_input.empty():
-			pitch_axis += Input.get_action_strength(positive_pitch_mapped_input)
-		input_rotation.y += pitch_axis * rotation_speed.y * 5
+		var factor : Vector2 = deg2rad(1) * rotation_speed # Note: do conversion twice to not make separate conversion from _input_rotation
+		if invert_axes & 0b01:
+			factor.x *= -1
+		if invert_axes & 0b10:
+			factor.y *= -1
 		
-		input_rotation.x = wrapf(input_rotation.x, -180, 180)
-		input_rotation.y = clamp(input_rotation.y, -90, 90)
-		var rot_y = -input_rotation.x if invert_axis & 0b01 else input_rotation.x
-		rotation_degrees.y = rad2deg(lerp_angle(deg2rad(rotation_degrees.x), deg2rad(rot_y), lerp_speed))
-		var rot_x = -input_rotation.y if invert_axis & 0b10 else input_rotation.y
-		rotation_degrees.x = lerp(rotation_degrees.y, rot_x, lerp_speed)
+		var make_rotation = Vector2.ZERO.linear_interpolate(_input_rotation * factor, lerp_speed)
+		
+		var target = instead_yaw_target if is_instance_valid(instead_yaw_target) else self
+		target.rotation.y += make_rotation.x
+		
+		target = instead_pitch_target if is_instance_valid(instead_pitch_target) else self
+		target.rotation.x = clamp(target.rotation.x + make_rotation.y, -TAU / 4, TAU / 4)
+		
+		# If lerped, relay rest of the movement to the next frame (otherwise results in zero).
+		_input_rotation -= make_rotation / factor
+
+
+func _get_property_list() -> Array:
+	var gen := preload("res://addons/virtualcamera/Helpers/PropertyListGenerator.gd").new(self)
+	
+	gen.append("rotation_speed")
+	gen.append_number_range("lerp_speed", 0, 1)
+	
+	gen.append("invert_axes", PROPERTY_HINT_FLAGS, "X,Y")
+	
+	gen.append_category("mouse")
+	gen.append("mouse_enabled")
+	gen.append("mouse_sensitivity")
+	
+	gen.append_category("mapped_input")
+	gen.append("mapped_input_yaw_positive")
+	gen.append("mapped_input_yaw_negative")
+	gen.append("mapped_input_pitch_positive")
+	gen.append("mapped_input_pitch_negative")
+	gen.append("mapped_input_sensitivity")
+	
+	gen.append_category("instead", "Rotate Other Instead")
+	gen.append("instead_yaw_target_path")
+	gen.append("instead_pitch_target_path")
+	return gen.properties
